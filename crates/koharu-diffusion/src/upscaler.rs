@@ -108,7 +108,6 @@ impl Upscaler {
                 image,
                 requested_factor,
                 &raw mut output.pointer,
-                &raw mut output.count,
             )
         };
         if !succeeded {

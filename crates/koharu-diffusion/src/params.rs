@@ -1159,6 +1159,7 @@ impl VideoGenerationParams {
                     "image preprocessing rules",
                 )?,
             },
+            ref_image_args: ptr::null(),
         };
         Ok(NativeVideoGenerationParams {
             raw,

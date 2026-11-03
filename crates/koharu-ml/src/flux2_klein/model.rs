@@ -1,4 +1,4 @@
-//! Native FLUX.2 Klein model assembly.
+//! Native FLUX.2 Klein model assembly, also used for FLUX.3 Image Klein.
 //!
 //! Component mapping follows stable-diffusion.cpp at:
 //! https://github.com/leejet/stable-diffusion.cpp/blob/cc734292286f85f9c48305d94d7fd22f42838522/docs/flux2.md
@@ -23,30 +23,34 @@ pub(super) struct ModelPaths {
 
 #[derive(Debug)]
 pub(super) struct Model {
+    /// Display name used in errors, such as "FLUX.2 Klein".
+    pub name: &'static str,
     context: Mutex<Context>,
 }
 
 impl Model {
-    pub fn new(device: &crate::Device, paths: ModelPaths) -> Result<Self> {
+    pub fn new(device: &crate::Device, name: &'static str, paths: ModelPaths) -> Result<Self> {
         let context = Context::new(&context_params(device, paths))
-            .context("failed to load FLUX.2 Klein components")?;
+            .with_context(|| format!("failed to load {name} components"))?;
         ensure!(
             context.supports_image_generation(),
-            "the loaded FLUX.2 Klein context does not support image generation"
+            "the loaded {name} context does not support image generation"
         );
         Ok(Self {
+            name,
             context: Mutex::new(context),
         })
     }
 
     pub fn forward(&self, params: &ImageGenerationParams) -> Result<Vec<RgbImage>> {
+        let name = self.name;
         let mut context = self
             .context
             .lock()
-            .map_err(|_| anyhow!("FLUX.2 Klein context lock was poisoned"))?;
+            .map_err(|_| anyhow!("{name} context lock was poisoned"))?;
         context
             .generate_image(params)
-            .context("FLUX.2 Klein inference failed")
+            .with_context(|| format!("{name} inference failed"))
     }
 }
 

@@ -2,7 +2,7 @@ use std::{hint::black_box, path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use criterion::Criterion;
-use koharu_ml::flux2_klein::{Flux2KleinInpaint, Flux2KleinInpaintOptions};
+use koharu_ml::flux2_klein::{Flux2KleinInpaint, Flux2KleinInpaintOptions, KleinVariant};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
     let options = Flux2KleinInpaintOptions::default();
 
     koharu_ml::init().await?;
-    let model = Flux2KleinInpaint::load(koharu_ml::Device::default()).await?;
+    let model = Flux2KleinInpaint::load(koharu_ml::Device::default(), KleinVariant::Flux2).await?;
 
     let output = model.inference("Remove the masked content.", &image, None, &mask, &options)?;
     let scale = (1_048_576.0 / (f64::from(image.width()) * f64::from(image.height()))).sqrt();

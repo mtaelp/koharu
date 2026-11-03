@@ -140,6 +140,7 @@ function ModelOptions({
         </div>
       )
     case 'flux2-klein':
+    case 'flux3-klein':
       return (
         <TextField
           label={t('settings.pipeline.options.prompt')}

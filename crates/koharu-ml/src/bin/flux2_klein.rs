@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 use koharu_ml::flux2_klein::{
-    Flux2Klein, Flux2KleinInpaint, Flux2KleinInpaintOptions, Flux2KleinOptions,
+    Flux2Klein, Flux2KleinInpaint, Flux2KleinInpaintOptions, Flux2KleinOptions, KleinVariant,
 };
 
 #[derive(Debug, Parser)]
@@ -23,8 +23,13 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     reference: Option<PathBuf>,
 
-    #[arg(long, default_value_t = 4)]
-    steps: usize,
+    /// Defaults to the checkpoint's tuned step count.
+    #[arg(long)]
+    steps: Option<usize>,
+
+    /// Inpaint with FLUX.3 Image Klein instead of FLUX.2 Klein.
+    #[arg(long, default_value_t = false, requires = "mask")]
+    flux3: bool,
 
     #[arg(long, default_value_t = 0.8)]
     strength: f64,
@@ -53,9 +58,16 @@ async fn main() -> Result<()> {
         let input = input
             .as_ref()
             .context("--input is required when --mask is provided")?;
-        let pipeline = Flux2KleinInpaint::load(koharu_ml::device(cli.cpu)).await?;
+        let variant = if cli.flux3 {
+            KleinVariant::Flux3
+        } else {
+            KleinVariant::Flux2
+        };
+        let pipeline = Flux2KleinInpaint::load(koharu_ml::device(cli.cpu), variant).await?;
         let options = Flux2KleinInpaintOptions {
-            num_inference_steps: cli.steps,
+            num_inference_steps: cli
+                .steps
+                .unwrap_or(variant.inpaint_options().num_inference_steps),
             strength: cli.strength,
             seed: cli.seed,
             padding_mask_crop: cli.padding_mask_crop,
@@ -64,7 +76,10 @@ async fn main() -> Result<()> {
     } else {
         let pipeline = Flux2Klein::load(koharu_ml::device(cli.cpu)).await?;
         let options = Flux2KleinOptions {
-            num_inference_steps: i32::try_from(cli.steps)?,
+            num_inference_steps: match cli.steps {
+                Some(steps) => i32::try_from(steps)?,
+                None => Flux2KleinOptions::default().num_inference_steps,
+            },
             seed: cli.seed,
             ..Flux2KleinOptions::default()
         };

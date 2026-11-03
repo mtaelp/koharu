@@ -305,6 +305,9 @@ named_ffi_enum! {
         SefiFlow = sys::SEFI_FLOW_PRED => "sefi_flow",
         MiniT2iFlow = sys::MINIT2I_FLOW_PRED => "minit2i_flow",
         SenseNovaU1Flow = sys::SENSENOVA_U1_FLOW_PRED => "sensenova_u1_flow",
+        Flux3Flow = sys::FLUX3_FLOW_PRED => "flux3_flow",
+        H3AvFlow = sys::H3_AV_FLOW_PRED => "h3_av_flow",
+        MingImageFlow = sys::MING_IMAGE_FLOW_PRED => "ming_image_flow",
         Auto = sys::PREDICTION_COUNT => "auto"
     }
 }

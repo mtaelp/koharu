@@ -13,7 +13,7 @@ use image::{
 use imageproc::region_labelling::{Connectivity, connected_components};
 use koharu_ml::{
     aot_inpainting::AotInpainting,
-    flux2_klein::{Flux2KleinInpaint, Flux2KleinInpaintOptions},
+    flux2_klein::{Flux2KleinInpaint, KleinVariant},
     lama::{InpaintRequest, LaMa},
     rorem_mixed::{DEFAULT_NEGATIVE_PROMPT, DEFAULT_PROMPT, RoremMixed, RoremMixedOptions},
 };
@@ -36,6 +36,20 @@ pub struct Flux2KleinConfig {
 }
 
 impl Default for Flux2KleinConfig {
+    fn default() -> Self {
+        Self {
+            prompt: "Remove the text and reconstruct the background.".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(default)]
+pub struct Flux3KleinConfig {
+    pub prompt: String,
+}
+
+impl Default for Flux3KleinConfig {
     fn default() -> Self {
         Self {
             prompt: "Remove the text and reconstruct the background.".to_owned(),
@@ -75,6 +89,12 @@ impl Processor {
                     "FLUX.2 prompt contains NUL"
                 );
             }
+            InpaintingModel::Flux3Klein(settings) => {
+                ensure!(
+                    !settings.prompt.contains('\0'),
+                    "FLUX.3 prompt contains NUL"
+                );
+            }
             InpaintingModel::RoremMixed(settings) => {
                 ensure!(
                     !settings.prompt.contains('\0') && !settings.negative_prompt.contains('\0'),
@@ -98,6 +118,7 @@ impl StageProcessor for Processor {
             InpaintingModel::LaMa {} => "lama",
             InpaintingModel::AotInpainting {} => "aot-inpainting",
             InpaintingModel::Flux2Klein(_) => "flux2-klein",
+            InpaintingModel::Flux3Klein(_) => "flux3-klein",
             InpaintingModel::RoremMixed(_) => "rorem-mixed",
         }
     }
@@ -146,7 +167,8 @@ enum Model {
     Aot(Arc<Mutex<AotInpainting>>),
     Flux {
         model: Arc<Mutex<Flux2KleinInpaint>>,
-        config: Flux2KleinConfig,
+        variant: KleinVariant,
+        prompt: String,
     },
     Rorem {
         model: Arc<Mutex<RoremMixed>>,
@@ -155,6 +177,18 @@ enum Model {
 }
 
 impl Model {
+    async fn load_flux(
+        device: koharu_ml::Device,
+        variant: KleinVariant,
+        prompt: &str,
+    ) -> Result<Self> {
+        Ok(Self::Flux {
+            model: Arc::new(Mutex::new(Flux2KleinInpaint::load(device, variant).await?)),
+            variant,
+            prompt: prompt.to_owned(),
+        })
+    }
+
     async fn load(device: koharu_ml::Device, config: &InpaintingModel) -> Result<Self> {
         match config {
             InpaintingModel::LaMa {} => {
@@ -163,10 +197,12 @@ impl Model {
             InpaintingModel::AotInpainting {} => Ok(Self::Aot(Arc::new(Mutex::new(
                 AotInpainting::load(device).await?,
             )))),
-            InpaintingModel::Flux2Klein(config) => Ok(Self::Flux {
-                model: Arc::new(Mutex::new(Flux2KleinInpaint::load(device).await?)),
-                config: config.clone(),
-            }),
+            InpaintingModel::Flux2Klein(config) => {
+                Self::load_flux(device, KleinVariant::Flux2, &config.prompt).await
+            }
+            InpaintingModel::Flux3Klein(config) => {
+                Self::load_flux(device, KleinVariant::Flux3, &config.prompt).await
+            }
             InpaintingModel::RoremMixed(config) => Ok(Self::Rorem {
                 model: Arc::new(Mutex::new(RoremMixed::load(device).await?)),
                 config: config.clone(),
@@ -230,11 +266,19 @@ impl Model {
                     .await?,
                 )
             }
-            Self::Flux { model, config } => {
+            Self::Flux {
+                model,
+                variant,
+                prompt,
+            } => {
                 let model = model.clone();
-                let config = config.clone();
+                let prompt = prompt.clone();
+                let options = variant.inpaint_options();
                 (
-                    "flux2-klein",
+                    match variant {
+                        KleinVariant::Flux2 => "flux2-klein",
+                        KleinVariant::Flux3 => "flux3-klein",
+                    },
                     tokio_rayon::spawn(move || -> Result<DynamicImage> {
                         let model = model
                             .lock()
@@ -246,11 +290,11 @@ impl Model {
                             &prepared.flat_fill_regions,
                             |image, mask| {
                                 model.inference(
-                                    &config.prompt,
+                                    &prompt,
                                     image,
                                     None,
                                     &DynamicImage::ImageLuma8(mask.clone()),
-                                    &Flux2KleinInpaintOptions::default(),
+                                    &options,
                                 )
                             },
                         )

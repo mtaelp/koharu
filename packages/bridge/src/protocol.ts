@@ -165,6 +165,10 @@ export type Flux2KleinConfig = {
 	prompt?: string,
 };
 
+export type Flux3KleinConfig = {
+	prompt?: string,
+};
+
 export type FontFace = {
 	postscript_name: string,
 	weight: number,
@@ -240,6 +244,8 @@ export type GroupRole = "text";
 export type InpaintingModel = { model: "lama" } | { model: "aot-inpainting" } | {
 	model: "flux2-klein",
 } & Flux2KleinConfig | {
+	model: "flux3-klein",
+} & Flux3KleinConfig | {
 	model: "rorem-mixed",
 } & RoremMixedConfig;
 
@@ -387,6 +393,7 @@ export type Preferences = {
 export type ProcessorConfig = {
 	"koharu-layout-rfdetr-seg-2xl"?: KoharuLayoutRFDetrSeg2XLConfig | null,
 	"flux2-klein"?: Flux2KleinConfig | null,
+	"flux3-klein"?: Flux3KleinConfig | null,
 	"rorem-mixed"?: RoremMixedConfig | null,
 };
 

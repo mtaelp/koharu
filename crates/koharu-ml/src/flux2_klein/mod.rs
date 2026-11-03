@@ -1,7 +1,12 @@
-//! FLUX.2 Klein 4B generation and inpainting.
+//! FLUX.2 Klein 4B generation, and FLUX.2 / FLUX.3 Image Klein inpainting.
 //!
 //! https://github.com/huggingface/diffusers/blob/a37f6f8394ac2a7ee8360c3abea811efe54512b1/src/diffusers/pipelines/flux2/pipeline_flux2_klein.py
 //! https://github.com/huggingface/diffusers/blob/a37f6f8394ac2a7ee8360c3abea811efe54512b1/src/diffusers/pipelines/flux2/pipeline_flux2_klein_inpaint.py
+//!
+//! FLUX.3 Image Klein keeps the FLUX.2 VAE and swaps in a FLUX.3 transformer
+//! and a Qwen3-VL 4B text encoder. The distilled checkpoint samples in 16
+//! steps with CFG 1.0 under the native default scheduler:
+//! https://github.com/leejet/stable-diffusion.cpp/blob/3be2378/docs/flux3.md
 
 mod model;
 mod processor;
@@ -12,6 +17,7 @@ use image::{DynamicImage, RgbImage};
 use koharu_diffusion::{
     GuidanceParams, ImageGenerationParams, SampleMethod, SampleParams, Scheduler,
 };
+use koharu_runtime::HuggingFaceFile;
 
 use self::{
     model::{Model, ModelPaths},
@@ -29,6 +35,58 @@ crate::model_repository!("black-forest-labs/FLUX.2-small-decoder" @ "a3efc24f613
 crate::model_repository!("unsloth/Qwen3-4B-GGUF" @ "22c9fc8a8c7700b76a1789366280a6a5a1ad1120" {
     TEXT_ENCODER_WEIGHTS = "Qwen3-4B-Q4_K_M.gguf"
 });
+crate::model_repository!("unsloth/flux-3-image-klein-GGUF" @ "12ef13ce920d53f45fe805093910c899668b9e76" {
+    FLUX3_TRANSFORMER_WEIGHTS = "flux-3-image-klein-UD-Q4_K_XL.gguf"
+});
+crate::model_repository!("Qwen/Qwen3-VL-4B-Instruct-GGUF" @ "1cd86afb9a95c410a6038ab3b40d8b578c892266" {
+    FLUX3_TEXT_ENCODER_WEIGHTS = "Qwen3VL-4B-Instruct-Q4_K_M.gguf"
+});
+
+/// Klein checkpoints that decode through the FLUX.2 VAE and share the
+/// inpainting flow below.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KleinVariant {
+    Flux2,
+    Flux3,
+}
+
+impl KleinVariant {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Flux2 => "FLUX.2 Klein",
+            Self::Flux3 => "FLUX.3 Klein",
+        }
+    }
+
+    fn weights(self) -> (HuggingFaceFile<'static>, HuggingFaceFile<'static>) {
+        match self {
+            Self::Flux2 => (TRANSFORMER_WEIGHTS, TEXT_ENCODER_WEIGHTS),
+            Self::Flux3 => (FLUX3_TRANSFORMER_WEIGHTS, FLUX3_TEXT_ENCODER_WEIGHTS),
+        }
+    }
+
+    fn scheduler(self) -> Scheduler {
+        match self {
+            Self::Flux2 => Scheduler::Flux2,
+            Self::Flux3 => Scheduler::Auto,
+        }
+    }
+
+    /// Inpainting options tuned for this checkpoint. FLUX.3 regenerates the
+    /// masked area fully: under its shifted default schedule, partial strength
+    /// leaves the source lettering visible.
+    pub fn inpaint_options(self) -> Flux2KleinInpaintOptions {
+        let defaults = Flux2KleinInpaintOptions::default();
+        match self {
+            Self::Flux2 => defaults,
+            Self::Flux3 => Flux2KleinInpaintOptions {
+                num_inference_steps: 16,
+                strength: 1.0,
+                ..defaults
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Flux2Klein {
@@ -45,6 +103,7 @@ impl Flux2Klein {
         .context("failed to resolve FLUX.2 Klein model assets")?;
         let model = Model::new(
             &device,
+            "FLUX.2 Klein",
             ModelPaths {
                 transformer,
                 text_encoder,
@@ -125,25 +184,33 @@ impl Flux2Klein {
 #[derive(Debug)]
 pub struct Flux2KleinInpaint {
     model: Model,
+    variant: KleinVariant,
 }
 
 impl Flux2KleinInpaint {
-    pub async fn load(device: crate::Device) -> Result<Self> {
+    pub async fn load(device: crate::Device, variant: KleinVariant) -> Result<Self> {
+        let name = variant.name();
+        let (transformer, text_encoder) = variant.weights();
         let (transformer, text_encoder, vae) = tokio::try_join!(
-            TRANSFORMER_WEIGHTS.resolve(),
-            TEXT_ENCODER_WEIGHTS.resolve(),
+            transformer.resolve(),
+            text_encoder.resolve(),
             VAE_WEIGHTS.resolve(),
         )
-        .context("failed to resolve FLUX.2 Klein model assets")?;
+        .with_context(|| format!("failed to resolve {name} model assets"))?;
         let model = Model::new(
             &device,
+            name,
             ModelPaths {
                 transformer,
                 text_encoder,
                 vae,
             },
         )?;
-        Ok(Self { model })
+        Ok(Self { model, variant })
+    }
+
+    pub fn variant(&self) -> KleinVariant {
+        self.variant
     }
 
     pub fn inference(
@@ -168,7 +235,8 @@ impl Flux2KleinInpaint {
         );
         ensure!(
             options.strength > 0.0 && options.strength <= 1.0,
-            "FLUX.2 inpaint strength must be greater than zero and at most one"
+            "{} inpaint strength must be greater than zero and at most one",
+            self.model.name
         );
         ensure!(
             options.num_inference_steps > 0,
@@ -270,7 +338,7 @@ impl Flux2KleinInpaint {
                         text_cfg: 1.0,
                         ..GuidanceParams::default()
                     },
-                    scheduler: Scheduler::Flux2,
+                    scheduler: self.variant.scheduler(),
                     sample_method: SampleMethod::Euler,
                     sample_steps: i32::try_from(options.num_inference_steps)?,
                     ..SampleParams::default()
@@ -282,7 +350,7 @@ impl Flux2KleinInpaint {
             })?
             .into_iter()
             .next()
-            .context("FLUX.2 Klein returned no inpainted image")?;
+            .with_context(|| format!("{} returned no inpainted image", self.model.name))?;
 
         let generated =
             Flux2ImageProcessor::apply_overlay(&mask_image, &image, generated, crop_coords)?;
