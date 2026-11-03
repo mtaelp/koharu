@@ -66,7 +66,9 @@ pub struct QwenImageTurboConfig {
 impl Default for QwenImageTurboConfig {
     fn default() -> Self {
         Self {
-            prompt: "Remove the text and reconstruct the background.".to_owned(),
+            prompt: "Remove the text, dots, ellipses and punctuation marks, and reconstruct the \
+                     background."
+                .to_owned(),
         }
     }
 }

@@ -141,11 +141,21 @@ function ModelOptions({
       )
     case 'flux2-klein':
     case 'flux3-klein':
-    case 'qwen-image-2.1-turbo':
       return (
         <TextField
           label={t('settings.pipeline.options.prompt')}
           value={model.prompt ?? 'Remove the text and reconstruct the background.'}
+          onChange={(prompt) => onChange({ ...model, prompt })}
+        />
+      )
+    case 'qwen-image-2.1-turbo':
+      return (
+        <TextField
+          label={t('settings.pipeline.options.prompt')}
+          value={
+            model.prompt ??
+            'Remove the text, dots, ellipses and punctuation marks, and reconstruct the background.'
+          }
           onChange={(prompt) => onChange({ ...model, prompt })}
         />
       )
