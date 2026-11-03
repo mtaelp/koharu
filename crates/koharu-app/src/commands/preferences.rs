@@ -187,6 +187,9 @@ fn remember_pipeline_profiles(config: &mut PipelineConfig) {
     if let koharu_pipeline::InpaintingModel::Flux3Klein(settings) = &config.inpainting {
         config.processor.flux3_klein = Some(settings.clone());
     }
+    if let koharu_pipeline::InpaintingModel::QwenImageTurbo(settings) = &config.inpainting {
+        config.processor.qwen_image_turbo = Some(settings.clone());
+    }
     if let koharu_pipeline::InpaintingModel::RoremMixed(settings) = &config.inpainting {
         config.processor.rorem_mixed = Some(settings.clone());
     }

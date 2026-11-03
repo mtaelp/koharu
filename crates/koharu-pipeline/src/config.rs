@@ -4,7 +4,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use specta::Type;
 
 use crate::stages::{
-    Flux2KleinConfig, Flux3KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixedConfig,
+    Flux2KleinConfig, Flux3KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, QwenImageTurboConfig,
+    RoremMixedConfig,
 };
 
 #[derive(Clone, Debug, PartialEq, Type)]
@@ -72,6 +73,7 @@ impl Serialize for PipelineConfig {
             InpaintingModel::AotInpainting {} => "aot-inpainting",
             InpaintingModel::Flux2Klein(_) => "flux2-klein",
             InpaintingModel::Flux3Klein(_) => "flux3-klein",
+            InpaintingModel::QwenImageTurbo(_) => "qwen-image-2.1-turbo",
             InpaintingModel::RoremMixed(_) => "rorem-mixed",
         };
         let mut processor = self.processor.clone();
@@ -85,6 +87,11 @@ impl Serialize for PipelineConfig {
             }
             InpaintingModel::Flux3Klein(config) => {
                 processor.flux3_klein.get_or_insert_with(|| config.clone());
+            }
+            InpaintingModel::QwenImageTurbo(config) => {
+                processor
+                    .qwen_image_turbo
+                    .get_or_insert_with(|| config.clone());
             }
             InpaintingModel::RoremMixed(config) => {
                 processor.rorem_mixed.get_or_insert_with(|| config.clone());
@@ -147,6 +154,9 @@ impl<'de> Deserialize<'de> for PipelineConfig {
             "flux3-klein" => {
                 InpaintingModel::Flux3Klein(file.processor.flux3_klein.clone().unwrap_or_default())
             }
+            "qwen-image-2.1-turbo" => InpaintingModel::QwenImageTurbo(
+                file.processor.qwen_image_turbo.clone().unwrap_or_default(),
+            ),
             "rorem-mixed" => {
                 InpaintingModel::RoremMixed(file.processor.rorem_mixed.clone().unwrap_or_default())
             }
@@ -234,6 +244,12 @@ impl PipelineConfig {
                     .clone()
                     .unwrap_or_else(|| config.clone()),
             )),
+            InpaintingModel::QwenImageTurbo(config) => Ok(InpaintingModel::QwenImageTurbo(
+                self.processor
+                    .qwen_image_turbo
+                    .clone()
+                    .unwrap_or_else(|| config.clone()),
+            )),
             InpaintingModel::RoremMixed(config) => Ok(InpaintingModel::RoremMixed(
                 self.processor
                     .rorem_mixed
@@ -268,6 +284,8 @@ pub struct ProcessorConfig {
     pub flux2_klein: Option<Flux2KleinConfig>,
     #[serde(rename = "flux3-klein")]
     pub flux3_klein: Option<Flux3KleinConfig>,
+    #[serde(rename = "qwen-image-2.1-turbo")]
+    pub qwen_image_turbo: Option<QwenImageTurboConfig>,
     #[serde(rename = "rorem-mixed")]
     pub rorem_mixed: Option<RoremMixedConfig>,
 }
@@ -303,6 +321,8 @@ pub enum InpaintingModel {
     Flux2Klein(Flux2KleinConfig),
     #[serde(rename = "flux3-klein")]
     Flux3Klein(Flux3KleinConfig),
+    #[serde(rename = "qwen-image-2.1-turbo")]
+    QwenImageTurbo(QwenImageTurboConfig),
     #[serde(rename = "rorem-mixed")]
     RoremMixed(RoremMixedConfig),
 }

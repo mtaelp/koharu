@@ -1,4 +1,4 @@
-//! Native FLUX.2 Klein model assembly, also used for FLUX.3 Image Klein.
+//! Native model assembly for FLUX.2 Klein and the other edit models.
 //!
 //! Component mapping follows stable-diffusion.cpp at:
 //! https://github.com/leejet/stable-diffusion.cpp/blob/cc734292286f85f9c48305d94d7fd22f42838522/docs/flux2.md
@@ -18,7 +18,10 @@ use crate::Backend;
 pub(super) struct ModelPaths {
     pub transformer: PathBuf,
     pub text_encoder: PathBuf,
+    /// Vision projector that lets the text encoder read reference images.
+    pub vision: Option<PathBuf>,
     pub vae: PathBuf,
+    pub vae_format: VaeFormat,
 }
 
 #[derive(Debug)]
@@ -61,13 +64,14 @@ fn context_params(device: &crate::Device, paths: ModelPaths) -> ContextParams {
     ContextParams {
         diffusion_model_path: Some(paths.transformer),
         llm_path: Some(paths.text_encoder),
+        llm_vision_path: paths.vision,
         vae_path: Some(paths.vae),
         enable_mmap: true,
         flash_attention: use_cuda,
         diffusion_flash_attention: use_cuda,
         diffusion_conv_direct: use_cuda,
         vae_conv_direct: use_cuda,
-        vae_format: VaeFormat::Flux2,
+        vae_format: paths.vae_format,
         backend: Some(device.name.clone()),
         // The text encoder and denoiser run in separate phases. Cards with less
         // headroom keep source parameters in RAM; high-VRAM cards avoid repeated

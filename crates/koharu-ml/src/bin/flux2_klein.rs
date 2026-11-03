@@ -1,10 +1,20 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use koharu_ml::flux2_klein::{
-    Flux2Klein, Flux2KleinInpaint, Flux2KleinInpaintOptions, Flux2KleinOptions, KleinVariant,
+    EditModel, Flux2Klein, Flux2KleinInpaint, Flux2KleinInpaintOptions, Flux2KleinOptions,
 };
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum InpaintModel {
+    #[value(name = "flux2-klein")]
+    Flux2Klein,
+    #[value(name = "flux3-klein")]
+    Flux3Klein,
+    #[value(name = "qwen-image-2.1-turbo")]
+    QwenImageTurbo,
+}
 
 #[derive(Debug, Parser)]
 struct Cli {
@@ -27,12 +37,13 @@ struct Cli {
     #[arg(long)]
     steps: Option<usize>,
 
-    /// Inpaint with FLUX.3 Image Klein instead of FLUX.2 Klein.
-    #[arg(long, default_value_t = false, requires = "mask")]
-    flux3: bool,
+    /// Edit model used when inpainting with --mask.
+    #[arg(long, value_enum, default_value = "flux2-klein", requires = "mask")]
+    model: InpaintModel,
 
-    #[arg(long, default_value_t = 0.8)]
-    strength: f64,
+    /// Defaults to the checkpoint's tuned strength.
+    #[arg(long)]
+    strength: Option<f64>,
 
     #[arg(long, default_value_t = -1)]
     seed: i64,
@@ -58,17 +69,16 @@ async fn main() -> Result<()> {
         let input = input
             .as_ref()
             .context("--input is required when --mask is provided")?;
-        let variant = if cli.flux3 {
-            KleinVariant::Flux3
-        } else {
-            KleinVariant::Flux2
+        let edit_model = match cli.model {
+            InpaintModel::Flux2Klein => EditModel::Flux2Klein,
+            InpaintModel::Flux3Klein => EditModel::Flux3Klein,
+            InpaintModel::QwenImageTurbo => EditModel::QwenImageTurbo,
         };
-        let pipeline = Flux2KleinInpaint::load(koharu_ml::device(cli.cpu), variant).await?;
+        let pipeline = Flux2KleinInpaint::load(koharu_ml::device(cli.cpu), edit_model).await?;
+        let tuned = edit_model.inpaint_options();
         let options = Flux2KleinInpaintOptions {
-            num_inference_steps: cli
-                .steps
-                .unwrap_or(variant.inpaint_options().num_inference_steps),
-            strength: cli.strength,
+            num_inference_steps: cli.steps.unwrap_or(tuned.num_inference_steps),
+            strength: cli.strength.unwrap_or(tuned.strength),
             seed: cli.seed,
             padding_mask_crop: cli.padding_mask_crop,
         };

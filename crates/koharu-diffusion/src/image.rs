@@ -53,8 +53,10 @@ pub(crate) fn raw_rgb_images(images: &[RgbImage]) -> Result<Vec<sys::sd_image_t>
     images.iter().map(raw_rgb_image).collect()
 }
 
+/// Copies a native RGB image. Models whose VAE works in RGBA, such as
+/// Qwen-Image 2.1, return four channels; the alpha channel is dropped.
 pub(crate) unsafe fn copy_rgb_from_raw(raw: &sys::sd_image_t) -> Result<RgbImage> {
-    if raw.channel != 3 {
+    if raw.channel != 3 && raw.channel != 4 {
         return Err(Error::UnexpectedNativeImageChannelCount {
             expected: 3,
             actual: raw.channel,
@@ -64,7 +66,15 @@ pub(crate) unsafe fn copy_rgb_from_raw(raw: &sys::sd_image_t) -> Result<RgbImage
     if raw.data.is_null() {
         return Err(Error::InvalidNativeOutput { kind: "RGB image" });
     }
-    let bytes = unsafe { slice::from_raw_parts(raw.data, len) }.to_vec();
+    let bytes = unsafe { slice::from_raw_parts(raw.data, len) };
+    let bytes = if raw.channel == 4 {
+        bytes
+            .chunks_exact(4)
+            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+            .collect()
+    } else {
+        bytes.to_vec()
+    };
     RgbImage::from_raw(raw.width, raw.height, bytes)
         .ok_or(Error::InvalidNativeOutput { kind: "RGB image" })
 }
@@ -213,6 +223,19 @@ mod tests {
         };
         let image = unsafe { copy_rgb_from_raw(&raw) }.unwrap();
         assert_eq!(image.into_raw(), pixels);
+    }
+
+    #[test]
+    fn drops_alpha_from_rgba_native_outputs() {
+        let mut pixels = vec![1, 2, 3, 255, 4, 5, 6, 255];
+        let raw = sys::sd_image_t {
+            width: 2,
+            height: 1,
+            channel: 4,
+            data: pixels.as_mut_ptr(),
+        };
+        let image = unsafe { copy_rgb_from_raw(&raw) }.unwrap();
+        assert_eq!(image.into_raw(), vec![1, 2, 3, 4, 5, 6]);
     }
 
     #[test]

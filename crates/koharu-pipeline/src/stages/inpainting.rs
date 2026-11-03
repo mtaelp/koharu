@@ -13,7 +13,7 @@ use image::{
 use imageproc::region_labelling::{Connectivity, connected_components};
 use koharu_ml::{
     aot_inpainting::AotInpainting,
-    flux2_klein::{Flux2KleinInpaint, KleinVariant},
+    flux2_klein::{EditModel, Flux2KleinInpaint},
     lama::{InpaintRequest, LaMa},
     rorem_mixed::{DEFAULT_NEGATIVE_PROMPT, DEFAULT_PROMPT, RoremMixed, RoremMixedOptions},
 };
@@ -59,6 +59,20 @@ impl Default for Flux3KleinConfig {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(default)]
+pub struct QwenImageTurboConfig {
+    pub prompt: String,
+}
+
+impl Default for QwenImageTurboConfig {
+    fn default() -> Self {
+        Self {
+            prompt: "Remove the text and reconstruct the background.".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(default)]
 pub struct RoremMixedConfig {
     pub prompt: String,
     pub negative_prompt: String,
@@ -95,6 +109,12 @@ impl Processor {
                     "FLUX.3 prompt contains NUL"
                 );
             }
+            InpaintingModel::QwenImageTurbo(settings) => {
+                ensure!(
+                    !settings.prompt.contains('\0'),
+                    "Qwen-Image prompt contains NUL"
+                );
+            }
             InpaintingModel::RoremMixed(settings) => {
                 ensure!(
                     !settings.prompt.contains('\0') && !settings.negative_prompt.contains('\0'),
@@ -119,6 +139,7 @@ impl StageProcessor for Processor {
             InpaintingModel::AotInpainting {} => "aot-inpainting",
             InpaintingModel::Flux2Klein(_) => "flux2-klein",
             InpaintingModel::Flux3Klein(_) => "flux3-klein",
+            InpaintingModel::QwenImageTurbo(_) => "qwen-image-2.1-turbo",
             InpaintingModel::RoremMixed(_) => "rorem-mixed",
         }
     }
@@ -167,7 +188,7 @@ enum Model {
     Aot(Arc<Mutex<AotInpainting>>),
     Flux {
         model: Arc<Mutex<Flux2KleinInpaint>>,
-        variant: KleinVariant,
+        edit_model: EditModel,
         prompt: String,
     },
     Rorem {
@@ -177,14 +198,16 @@ enum Model {
 }
 
 impl Model {
-    async fn load_flux(
+    async fn load_edit(
         device: koharu_ml::Device,
-        variant: KleinVariant,
+        edit_model: EditModel,
         prompt: &str,
     ) -> Result<Self> {
         Ok(Self::Flux {
-            model: Arc::new(Mutex::new(Flux2KleinInpaint::load(device, variant).await?)),
-            variant,
+            model: Arc::new(Mutex::new(
+                Flux2KleinInpaint::load(device, edit_model).await?,
+            )),
+            edit_model,
             prompt: prompt.to_owned(),
         })
     }
@@ -198,10 +221,13 @@ impl Model {
                 AotInpainting::load(device).await?,
             )))),
             InpaintingModel::Flux2Klein(config) => {
-                Self::load_flux(device, KleinVariant::Flux2, &config.prompt).await
+                Self::load_edit(device, EditModel::Flux2Klein, &config.prompt).await
             }
             InpaintingModel::Flux3Klein(config) => {
-                Self::load_flux(device, KleinVariant::Flux3, &config.prompt).await
+                Self::load_edit(device, EditModel::Flux3Klein, &config.prompt).await
+            }
+            InpaintingModel::QwenImageTurbo(config) => {
+                Self::load_edit(device, EditModel::QwenImageTurbo, &config.prompt).await
             }
             InpaintingModel::RoremMixed(config) => Ok(Self::Rorem {
                 model: Arc::new(Mutex::new(RoremMixed::load(device).await?)),
@@ -268,16 +294,17 @@ impl Model {
             }
             Self::Flux {
                 model,
-                variant,
+                edit_model,
                 prompt,
             } => {
                 let model = model.clone();
                 let prompt = prompt.clone();
-                let options = variant.inpaint_options();
+                let options = edit_model.inpaint_options();
                 (
-                    match variant {
-                        KleinVariant::Flux2 => "flux2-klein",
-                        KleinVariant::Flux3 => "flux3-klein",
+                    match edit_model {
+                        EditModel::Flux2Klein => "flux2-klein",
+                        EditModel::Flux3Klein => "flux3-klein",
+                        EditModel::QwenImageTurbo => "qwen-image-2.1-turbo",
                     },
                     tokio_rayon::spawn(move || -> Result<DynamicImage> {
                         let model = model

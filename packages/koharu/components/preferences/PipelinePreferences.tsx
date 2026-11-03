@@ -141,6 +141,7 @@ function ModelOptions({
       )
     case 'flux2-klein':
     case 'flux3-klein':
+    case 'qwen-image-2.1-turbo':
       return (
         <TextField
           label={t('settings.pipeline.options.prompt')}

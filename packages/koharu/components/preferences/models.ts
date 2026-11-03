@@ -13,7 +13,14 @@ export type ModelName = PipelineModel['model']
 export const modelOptions = {
   detection: ['koharu-layout-rfdetr-seg-2xl'],
   ocr: ['paddleocr-vl-1.6', 'manga-ocr', 'baberu-ocr', 'hayai-ocr'],
-  inpainting: ['lama', 'aot-inpainting', 'flux2-klein', 'flux3-klein', 'rorem-mixed'],
+  inpainting: [
+    'lama',
+    'aot-inpainting',
+    'flux2-klein',
+    'flux3-klein',
+    'qwen-image-2.1-turbo',
+    'rorem-mixed',
+  ],
 } satisfies Record<ModelStage, ModelName[]>
 
 export const modelNames: Record<ModelName, string> = {
@@ -26,6 +33,7 @@ export const modelNames: Record<ModelName, string> = {
   'aot-inpainting': 'AOT Inpainting',
   'flux2-klein': 'FLUX.2 Klein',
   'flux3-klein': 'FLUX.3 Klein',
+  'qwen-image-2.1-turbo': 'Qwen-Image 2.1 Turbo',
   'rorem-mixed': 'RORem Mixed',
 }
 
@@ -42,6 +50,7 @@ export function defaultModel(model: ModelName): PipelineModel {
       return { model }
     case 'flux2-klein':
     case 'flux3-klein':
+    case 'qwen-image-2.1-turbo':
       return { model, prompt: 'Remove the text and reconstruct the background.' }
     case 'rorem-mixed':
       return { model }
@@ -93,6 +102,9 @@ export function replaceStage(
             : {}),
           ...(model.model === 'flux3-klein'
             ? { 'flux3-klein': { prompt: model.prompt ?? undefined } }
+            : {}),
+          ...(model.model === 'qwen-image-2.1-turbo'
+            ? { 'qwen-image-2.1-turbo': { prompt: model.prompt ?? undefined } }
             : {}),
           ...(model.model === 'rorem-mixed'
             ? {

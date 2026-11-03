@@ -12,7 +12,7 @@ use koharu_config::Config;
 use koharu_pipeline::{
     Committer, DetectionModel, Flux2KleinConfig, Flux3KleinConfig, InpaintingModel,
     KoharuLayoutRFDetrSeg2XLConfig, OcrModel, Operation, Pipeline, PipelineConfig, Progress,
-    Request, RoremMixedConfig, Scope, StageOutput, TranslationConfig,
+    QwenImageTurboConfig, Request, RoremMixedConfig, Scope, StageOutput, TranslationConfig,
 };
 use koharu_rasterizer::{RasterOptions, Rasterizer};
 use koharu_renderer::Renderer;
@@ -87,6 +87,8 @@ enum InpaintingChoice {
     Flux2Klein,
     #[value(name = "flux3-klein")]
     Flux3Klein,
+    #[value(name = "qwen-image-2.1-turbo")]
+    QwenImageTurbo,
     #[value(name = "rorem-mixed")]
     RoremMixed,
 }
@@ -127,6 +129,9 @@ impl Arguments {
                 }
                 InpaintingChoice::Flux3Klein => {
                     InpaintingModel::Flux3Klein(Flux3KleinConfig::default())
+                }
+                InpaintingChoice::QwenImageTurbo => {
+                    InpaintingModel::QwenImageTurbo(QwenImageTurboConfig::default())
                 }
                 InpaintingChoice::RoremMixed => {
                     InpaintingModel::RoremMixed(RoremMixedConfig::default())

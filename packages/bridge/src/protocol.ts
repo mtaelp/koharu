@@ -246,6 +246,8 @@ export type InpaintingModel = { model: "lama" } | { model: "aot-inpainting" } | 
 } & Flux2KleinConfig | {
 	model: "flux3-klein",
 } & Flux3KleinConfig | {
+	model: "qwen-image-2.1-turbo",
+} & QwenImageTurboConfig | {
 	model: "rorem-mixed",
 } & RoremMixedConfig;
 
@@ -394,6 +396,7 @@ export type ProcessorConfig = {
 	"koharu-layout-rfdetr-seg-2xl"?: KoharuLayoutRFDetrSeg2XLConfig | null,
 	"flux2-klein"?: Flux2KleinConfig | null,
 	"flux3-klein"?: Flux3KleinConfig | null,
+	"qwen-image-2.1-turbo"?: QwenImageTurboConfig | null,
 	"rorem-mixed"?: RoremMixedConfig | null,
 };
 
@@ -427,6 +430,10 @@ export type Quantization = {
 	id: string,
 	name: string,
 	downloaded: boolean,
+};
+
+export type QwenImageTurboConfig = {
+	prompt?: string,
 };
 
 export type RasterLayerKind = "cleanup" | "paint";
