@@ -58,9 +58,7 @@ impl Model {
 }
 
 fn context_params(device: &crate::Device, paths: ModelPaths) -> ContextParams {
-    let use_accelerator = device.backend != Backend::Cpu;
     let use_cuda = device.backend == Backend::Cuda;
-    let keep_parameters_resident = use_accelerator && device.memory_free >= 20 * 1024 * 1024 * 1024;
     ContextParams {
         diffusion_model_path: Some(paths.transformer),
         llm_path: Some(paths.text_encoder),
@@ -73,10 +71,11 @@ fn context_params(device: &crate::Device, paths: ModelPaths) -> ContextParams {
         vae_conv_direct: use_cuda,
         vae_format: paths.vae_format,
         backend: Some(device.name.clone()),
-        // The text encoder and denoiser run in separate phases. Cards with less
-        // headroom keep source parameters in RAM; high-VRAM cards avoid repeated
-        // staging by retaining both quantized models on the accelerator.
-        params_backend: (use_accelerator && !keep_parameters_resident).then(|| "*=cpu".to_owned()),
+        // Auto-fit places parameters from live free VRAM: they stay resident on
+        // the accelerator when they fit, so each tile skips re-staging gigabytes
+        // of weights, and fall back to RAM staging on smaller cards.
+        // https://github.com/leejet/stable-diffusion.cpp/blob/3be2378/docs/backend.md
+        auto_fit: true,
         ..ContextParams::default()
     }
 }
