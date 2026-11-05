@@ -434,6 +434,7 @@ export type Quantization = {
 
 export type QwenImageTurboConfig = {
 	prompt?: string,
+	tiny_vae?: boolean,
 };
 
 export type RasterLayerKind = "cleanup" | "paint";

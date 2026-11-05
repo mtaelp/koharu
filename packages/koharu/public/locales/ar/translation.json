@@ -390,7 +390,8 @@
         "negativePrompt": "الطلب السلبي",
         "panelThreshold": "عتبة الألواح",
         "prompt": "الطلب",
-        "textThreshold": "عتبة النص"
+        "textThreshold": "عتبة النص",
+        "tinyVae": "VAE صغير (أسرع)"
       },
       "processing": "المعالجة",
       "stages": {

@@ -45,6 +45,10 @@ struct Cli {
     #[arg(long)]
     strength: Option<f64>,
 
+    /// Use TAEQI2.1 instead of the full VAE with qwen-image-2.1-turbo.
+    #[arg(long, default_value_t = false)]
+    tiny_vae: bool,
+
     #[arg(long, default_value_t = -1)]
     seed: i64,
 
@@ -72,7 +76,9 @@ async fn main() -> Result<()> {
         let edit_model = match cli.model {
             InpaintModel::Flux2Klein => EditModel::Flux2Klein,
             InpaintModel::Flux3Klein => EditModel::Flux3Klein,
-            InpaintModel::QwenImageTurbo => EditModel::QwenImageTurbo,
+            InpaintModel::QwenImageTurbo => EditModel::QwenImageTurbo {
+                tiny_vae: cli.tiny_vae,
+            },
         };
         let pipeline = Flux2KleinInpaint::load(koharu_ml::device(cli.cpu), edit_model).await?;
         let tuned = edit_model.inpaint_options();

@@ -390,7 +390,8 @@
         "negativePrompt": "Negatif istem",
         "panelThreshold": "Panel eşiği",
         "prompt": "İstem",
-        "textThreshold": "Metin eşiği"
+        "textThreshold": "Metin eşiği",
+        "tinyVae": "Küçük VAE (daha hızlı)"
       },
       "processing": "İşleniyor",
       "stages": {

@@ -390,7 +390,8 @@
         "negativePrompt": "Негативный промпт",
         "panelThreshold": "Порог панели",
         "prompt": "Промпт",
-        "textThreshold": "Порог текста"
+        "textThreshold": "Порог текста",
+        "tinyVae": "Малый VAE (быстрее)"
       },
       "processing": "Обработка",
       "stages": {

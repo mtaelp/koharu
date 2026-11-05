@@ -13,6 +13,10 @@
 //! vision projector encodes the reference images. It samples Turbo's fixed
 //! 8-step sigma schedule at CFG 1.0, with dimensions divisible by 32:
 //! https://github.com/leejet/stable-diffusion.cpp/blob/3be2378/docs/qwen_image_2.1.md
+//!
+//! TAEQI2.1 can replace its VAE for both encoding and decoding, trading some
+//! fidelity for speed under the same latent API:
+//! https://huggingface.co/madebyollin/taeqi2_1
 
 mod model;
 mod processor;
@@ -58,6 +62,9 @@ crate::model_repository!("unsloth/Qwen3-VL-8B-Instruct-GGUF" @ "b93a7ee713758252
     QWEN_IMAGE_TEXT_ENCODER_WEIGHTS = "Qwen3-VL-8B-Instruct-UD-Q4_K_XL.gguf",
     QWEN_IMAGE_VISION_WEIGHTS = "mmproj-F16.gguf",
 });
+crate::model_repository!("madebyollin/taeqi2_1" @ "5d62f11fee0068b4df7bd699ddab685e32174010" {
+    QWEN_IMAGE_TINY_VAE_WEIGHTS = "taeqi2_1.safetensors"
+});
 
 /// Qwen-Image 2.1 Turbo's distilled schedule, including the terminal sigma.
 /// https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo/blob/main/model_index.json
@@ -70,7 +77,7 @@ const QWEN_IMAGE_TURBO_SIGMAS: [f32; 9] = [
 pub enum EditModel {
     Flux2Klein,
     Flux3Klein,
-    QwenImageTurbo,
+    QwenImageTurbo { tiny_vae: bool },
 }
 
 /// Assets and sampling settings for one [`EditModel`].
@@ -81,6 +88,8 @@ struct Checkpoint {
     text_encoder: HuggingFaceFile<'static>,
     vision: Option<HuggingFaceFile<'static>>,
     vae: HuggingFaceFile<'static>,
+    /// `vae` is a tiny autoencoder rather than the checkpoint's full VAE.
+    tiny_vae: bool,
     vae_format: VaeFormat,
     scheduler: Scheduler,
     sigmas: &'static [f32],
@@ -97,6 +106,7 @@ impl EditModel {
                 text_encoder: TEXT_ENCODER_WEIGHTS,
                 vision: None,
                 vae: VAE_WEIGHTS,
+                tiny_vae: false,
                 vae_format: VaeFormat::Flux2,
                 scheduler: Scheduler::Flux2,
                 sigmas: &[],
@@ -108,17 +118,23 @@ impl EditModel {
                 text_encoder: FLUX3_TEXT_ENCODER_WEIGHTS,
                 vision: None,
                 vae: VAE_WEIGHTS,
+                tiny_vae: false,
                 vae_format: VaeFormat::Flux2,
                 scheduler: Scheduler::Auto,
                 sigmas: &[],
                 alignment: 16,
             },
-            Self::QwenImageTurbo => Checkpoint {
+            Self::QwenImageTurbo { tiny_vae } => Checkpoint {
                 name: "Qwen-Image 2.1 Turbo",
                 transformer: QWEN_IMAGE_TRANSFORMER_WEIGHTS,
                 text_encoder: QWEN_IMAGE_TEXT_ENCODER_WEIGHTS,
                 vision: Some(QWEN_IMAGE_VISION_WEIGHTS),
-                vae: QWEN_IMAGE_VAE_WEIGHTS,
+                vae: if tiny_vae {
+                    QWEN_IMAGE_TINY_VAE_WEIGHTS
+                } else {
+                    QWEN_IMAGE_VAE_WEIGHTS
+                },
+                tiny_vae,
                 vae_format: VaeFormat::Auto,
                 scheduler: Scheduler::Auto,
                 sigmas: &QWEN_IMAGE_TURBO_SIGMAS,
@@ -140,7 +156,7 @@ impl EditModel {
                 ..defaults
             },
             // The sigma schedule fixes the step count.
-            Self::QwenImageTurbo => Flux2KleinInpaintOptions {
+            Self::QwenImageTurbo { .. } => Flux2KleinInpaintOptions {
                 num_inference_steps: QWEN_IMAGE_TURBO_SIGMAS.len() - 1,
                 strength: 1.0,
                 ..defaults
@@ -170,6 +186,7 @@ impl Flux2Klein {
                 text_encoder,
                 vision: None,
                 vae,
+                tiny_vae: false,
                 vae_format: VaeFormat::Flux2,
             },
         )?;
@@ -274,6 +291,7 @@ impl Flux2KleinInpaint {
                 text_encoder,
                 vision,
                 vae,
+                tiny_vae: checkpoint.tiny_vae,
                 vae_format: checkpoint.vae_format,
             },
         )?;

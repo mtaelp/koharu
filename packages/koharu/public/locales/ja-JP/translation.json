@@ -390,7 +390,8 @@
         "negativePrompt": "ネガティブプロンプト",
         "panelThreshold": "コマしきい値",
         "prompt": "プロンプト",
-        "textThreshold": "テキストしきい値"
+        "textThreshold": "テキストしきい値",
+        "tinyVae": "Tiny VAE(高速)"
       },
       "processing": "処理中",
       "stages": {

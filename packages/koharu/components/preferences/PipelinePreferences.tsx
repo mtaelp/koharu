@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@koharu/ui/components/select'
+import { Switch } from '@koharu/ui/components/switch'
 
 const stages = [
   ['detection', Search],
@@ -150,14 +151,23 @@ function ModelOptions({
       )
     case 'qwen-image-2.1-turbo':
       return (
-        <TextField
-          label={t('settings.pipeline.options.prompt')}
-          value={
-            model.prompt ??
-            'Remove the text, dots, ellipses and punctuation marks, and reconstruct the background.'
-          }
-          onChange={(prompt) => onChange({ ...model, prompt })}
-        />
+        <div className='grid gap-2'>
+          <TextField
+            label={t('settings.pipeline.options.prompt')}
+            value={
+              model.prompt ??
+              'Remove the text, dots, ellipses and punctuation marks, and reconstruct the background.'
+            }
+            onChange={(prompt) => onChange({ ...model, prompt })}
+          />
+          <label className='flex items-center justify-between gap-2 text-[11px] text-muted-foreground'>
+            {t('settings.pipeline.options.tinyVae')}
+            <Switch
+              checked={model.tiny_vae ?? false}
+              onCheckedChange={(tiny_vae) => onChange({ ...model, tiny_vae })}
+            />
+          </label>
+        </div>
       )
     case 'rorem-mixed':
       return (

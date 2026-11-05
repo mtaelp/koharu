@@ -56,6 +56,7 @@ export function defaultModel(model: ModelName): PipelineModel {
         model,
         prompt:
           'Remove the text, dots, ellipses and punctuation marks, and reconstruct the background.',
+        tiny_vae: false,
       }
     case 'rorem-mixed':
       return { model }
@@ -109,7 +110,12 @@ export function replaceStage(
             ? { 'flux3-klein': { prompt: model.prompt ?? undefined } }
             : {}),
           ...(model.model === 'qwen-image-2.1-turbo'
-            ? { 'qwen-image-2.1-turbo': { prompt: model.prompt ?? undefined } }
+            ? {
+                'qwen-image-2.1-turbo': {
+                  prompt: model.prompt ?? undefined,
+                  tiny_vae: model.tiny_vae ?? undefined,
+                },
+              }
             : {}),
           ...(model.model === 'rorem-mixed'
             ? {

@@ -61,6 +61,7 @@ impl Default for Flux3KleinConfig {
 #[serde(default)]
 pub struct QwenImageTurboConfig {
     pub prompt: String,
+    pub tiny_vae: bool,
 }
 
 impl Default for QwenImageTurboConfig {
@@ -69,6 +70,7 @@ impl Default for QwenImageTurboConfig {
             prompt: "Remove the text, dots, ellipses and punctuation marks, and reconstruct the \
                      background."
                 .to_owned(),
+            tiny_vae: false,
         }
     }
 }
@@ -229,7 +231,10 @@ impl Model {
                 Self::load_edit(device, EditModel::Flux3Klein, &config.prompt).await
             }
             InpaintingModel::QwenImageTurbo(config) => {
-                Self::load_edit(device, EditModel::QwenImageTurbo, &config.prompt).await
+                let edit_model = EditModel::QwenImageTurbo {
+                    tiny_vae: config.tiny_vae,
+                };
+                Self::load_edit(device, edit_model, &config.prompt).await
             }
             InpaintingModel::RoremMixed(config) => Ok(Self::Rorem {
                 model: Arc::new(Mutex::new(RoremMixed::load(device).await?)),
@@ -306,7 +311,7 @@ impl Model {
                     match edit_model {
                         EditModel::Flux2Klein => "flux2-klein",
                         EditModel::Flux3Klein => "flux3-klein",
-                        EditModel::QwenImageTurbo => "qwen-image-2.1-turbo",
+                        EditModel::QwenImageTurbo { .. } => "qwen-image-2.1-turbo",
                     },
                     tokio_rayon::spawn(move || -> Result<DynamicImage> {
                         let model = model

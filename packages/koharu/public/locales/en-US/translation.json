@@ -390,7 +390,8 @@
         "negativePrompt": "Negative prompt",
         "panelThreshold": "Panel threshold",
         "prompt": "Prompt",
-        "textThreshold": "Text threshold"
+        "textThreshold": "Text threshold",
+        "tinyVae": "Tiny VAE (faster)"
       },
       "processing": "Processing",
       "stages": {

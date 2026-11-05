@@ -390,7 +390,8 @@
         "negativePrompt": "Prompt négatif",
         "panelThreshold": "Seuil des cases",
         "prompt": "Prompt",
-        "textThreshold": "Seuil du texte"
+        "textThreshold": "Seuil du texte",
+        "tinyVae": "VAE miniature (plus rapide)"
       },
       "processing": "Traitement",
       "stages": {

@@ -21,6 +21,8 @@ pub(super) struct ModelPaths {
     /// Vision projector that lets the text encoder read reference images.
     pub vision: Option<PathBuf>,
     pub vae: PathBuf,
+    /// `vae` holds a tiny autoencoder, which stable-diffusion.cpp loads separately.
+    pub tiny_vae: bool,
     pub vae_format: VaeFormat,
 }
 
@@ -63,7 +65,8 @@ fn context_params(device: &crate::Device, paths: ModelPaths) -> ContextParams {
         diffusion_model_path: Some(paths.transformer),
         llm_path: Some(paths.text_encoder),
         llm_vision_path: paths.vision,
-        vae_path: Some(paths.vae),
+        vae_path: (!paths.tiny_vae).then(|| paths.vae.clone()),
+        taesd_path: paths.tiny_vae.then_some(paths.vae),
         enable_mmap: true,
         flash_attention: use_cuda,
         diffusion_flash_attention: use_cuda,

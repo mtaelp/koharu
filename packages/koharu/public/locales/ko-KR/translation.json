@@ -390,7 +390,8 @@
         "negativePrompt": "네거티브 프롬프트",
         "panelThreshold": "패널 임곗값",
         "prompt": "프롬프트",
-        "textThreshold": "텍스트 임곗값"
+        "textThreshold": "텍스트 임곗값",
+        "tinyVae": "Tiny VAE (더 빠름)"
       },
       "processing": "처리 중",
       "stages": {
